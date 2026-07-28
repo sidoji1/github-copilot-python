@@ -8,6 +8,8 @@ STARTER_DIR = REPO_ROOT / "starter"
 if str(STARTER_DIR) not in sys.path:
     sys.path.insert(0, str(STARTER_DIR))
 
+import sudoku_logic
+
 
 def test_flask_app_loads():
     """Verify the Flask app can be imported successfully."""
@@ -49,3 +51,12 @@ def test_new_game_uses_requested_difficulty(monkeypatch):
 
     assert response.status_code == 200
     assert captured['clues'] == app_module.sudoku_logic.DIFFICULTY_SETTINGS['hard']
+
+
+def test_generated_puzzles_have_unique_solution():
+    """Verify generated puzzles have exactly one valid solution."""
+    puzzle, _ = sudoku_logic.generate_puzzle(clues=sudoku_logic.DIFFICULTY_SETTINGS['medium'])
+
+    solution_count = sudoku_logic.count_solutions(puzzle)
+
+    assert solution_count == 1

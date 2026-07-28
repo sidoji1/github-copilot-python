@@ -1,10 +1,47 @@
 import copy
 import random
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 SIZE = 9
 EMPTY = 0
 Board = List[List[int]]
+
+
+def find_next_empty_cell(board: Board) -> Optional[Tuple[int, int]]:
+    """Return the next empty cell position in the board, if one exists."""
+    for row in range(SIZE):
+        for col in range(SIZE):
+            if board[row][col] == EMPTY:
+                return row, col
+    return None
+
+
+def count_solutions(board: Board) -> int:
+    """Return the number of valid Sudoku solutions for the provided board.
+
+    The count stops at two solutions for efficiency, which is sufficient to
+    determine whether a puzzle has a unique solution.
+    """
+    def backtrack(current_board: Board) -> int:
+        next_empty_cell = find_next_empty_cell(current_board)
+        if next_empty_cell is None:
+            return 1
+
+        row, col = next_empty_cell
+        total_solutions = 0
+        for candidate in random.sample(range(1, SIZE + 1), SIZE):
+            if not is_safe(current_board, row, col, candidate):
+                continue
+
+            current_board[row][col] = candidate
+            total_solutions += backtrack(current_board)
+            current_board[row][col] = EMPTY
+            if total_solutions >= 2:
+                return 2
+
+        return total_solutions
+
+    return backtrack(deep_copy(board))
 
 # Difficulty settings map each level to a target clue count.
 # More clues means a easier puzzle because fewer cells are removed.
@@ -61,14 +98,25 @@ def fill_board(board: Board) -> bool:
 
 
 def remove_cells(board: Board, clues: int) -> None:
-    """Remove cells from the board until the remaining clue count is reached."""
-    attempts = SIZE * SIZE - clues
-    while attempts > 0:
-        row = random.randrange(SIZE)
-        col = random.randrange(SIZE)
-        if board[row][col] != EMPTY:
-            board[row][col] = EMPTY
-            attempts -= 1
+    """Remove cells from the board while preserving a unique solution."""
+    cells_to_remove = SIZE * SIZE - clues
+    removed = 0
+    positions = [(row, col) for row in range(SIZE) for col in range(SIZE)]
+    random.shuffle(positions)
+
+    for row, col in positions:
+        if removed >= cells_to_remove:
+            break
+        if board[row][col] == EMPTY:
+            continue
+
+        value = board[row][col]
+        board[row][col] = EMPTY
+        if count_solutions(board) != 1:
+            board[row][col] = value
+            continue
+
+        removed += 1
 
 
 def get_clues_for_difficulty(difficulty: str | None = None) -> int:
