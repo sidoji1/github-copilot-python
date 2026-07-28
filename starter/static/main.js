@@ -53,6 +53,100 @@ function initializeTheme() {
   applyTheme(theme);
 }
 
+function clearBoardHighlights() {
+  const boardDiv = document.getElementById('sudoku-board');
+  if (!boardDiv) {
+    return;
+  }
+
+  const inputs = boardDiv.getElementsByTagName('input');
+  for (let idx = 0; idx < inputs.length; idx++) {
+    inputs[idx].classList.remove('invalid', 'incorrect');
+  }
+}
+
+function getCellIndicesForRowCol(row, col) {
+  return row * SIZE + col;
+}
+
+function getPeerIndices(row, col) {
+  const indices = new Set();
+
+  for (let currentCol = 0; currentCol < SIZE; currentCol++) {
+    if (currentCol !== col) {
+      indices.add(getCellIndicesForRowCol(row, currentCol));
+    }
+  }
+
+  for (let currentRow = 0; currentRow < SIZE; currentRow++) {
+    if (currentRow !== row) {
+      indices.add(getCellIndicesForRowCol(currentRow, col));
+    }
+  }
+
+  const startRow = Math.floor(row / 3) * 3;
+  const startCol = Math.floor(col / 3) * 3;
+  for (let currentRow = startRow; currentRow < startRow + 3; currentRow++) {
+    for (let currentCol = startCol; currentCol < startCol + 3; currentCol++) {
+      if (currentRow !== row || currentCol !== col) {
+        indices.add(getCellIndicesForRowCol(currentRow, currentCol));
+      }
+    }
+  }
+
+  return Array.from(indices);
+}
+
+function updateInvalidHighlights() {
+  const boardDiv = document.getElementById('sudoku-board');
+  if (!boardDiv) {
+    return;
+  }
+
+  const inputs = Array.from(boardDiv.getElementsByTagName('input'));
+  clearBoardHighlights();
+
+  const board = [];
+  for (let row = 0; row < SIZE; row++) {
+    board[row] = [];
+    for (let col = 0; col < SIZE; col++) {
+      const idx = getCellIndicesForRowCol(row, col);
+      const value = inputs[idx].value ? parseInt(inputs[idx].value, 10) : 0;
+      board[row][col] = value;
+    }
+  }
+
+  const highlightedIndices = new Set();
+  inputs.forEach((input, idx) => {
+    if (input.disabled) {
+      return;
+    }
+
+    const row = Math.floor(idx / SIZE);
+    const col = idx % SIZE;
+    const value = board[row][col];
+    if (!value) {
+      return;
+    }
+
+    for (const peerIndex of getPeerIndices(row, col)) {
+      const peerRow = Math.floor(peerIndex / SIZE);
+      const peerCol = peerIndex % SIZE;
+      const peerValue = board[peerRow][peerCol];
+      if (peerValue === value && peerIndex !== idx) {
+        highlightedIndices.add(idx);
+        if (!inputs[peerIndex].disabled) {
+          highlightedIndices.add(peerIndex);
+        }
+      }
+    }
+  });
+
+  highlightedIndices.forEach((idx) => {
+    inputs[idx].classList.add('invalid');
+  });
+}
+
 function createBoardElement() {
   const boardDiv = document.getElementById('sudoku-board');
   boardDiv.innerHTML = '';
@@ -69,6 +163,7 @@ function createBoardElement() {
       input.addEventListener('input', (e) => {
         const val = e.target.value.replace(/[^1-9]/g, '');
         e.target.value = val;
+        updateInvalidHighlights();
       });
       rowDiv.appendChild(input);
     }
@@ -86,16 +181,19 @@ function renderPuzzle(puz) {
       const idx = i * SIZE + j;
       const val = puzzle[i][j];
       const inp = inputs[idx];
+      inp.classList.remove('prefilled', 'invalid', 'incorrect');
       if (val !== 0) {
         inp.value = val;
         inp.disabled = true;
-        inp.className += ' prefilled';
+        inp.classList.add('prefilled');
       } else {
         inp.value = '';
         inp.disabled = false;
       }
     }
   }
+
+  clearBoardHighlights();
 }
 
 function renderLeaderboard(entries) {
@@ -166,9 +264,9 @@ async function checkSolution() {
   for (let idx = 0; idx < inputs.length; idx++) {
     const inp = inputs[idx];
     if (inp.disabled) continue;
-    inp.className = 'sudoku-cell';
+    inp.classList.remove('incorrect');
     if (incorrect.has(idx)) {
-      inp.className = 'sudoku-cell incorrect';
+      inp.classList.add('incorrect');
     }
   }
   if (data.completed) {
@@ -217,7 +315,8 @@ async function getHint() {
 
   if (inp.value === '') {
     inp.value = data.value;
-    inp.className = 'sudoku-cell';
+    inp.classList.remove('invalid', 'incorrect');
+    clearBoardHighlights();
     msg.style.color = '#388e3c';
     msg.innerText = 'Hint applied.';
   } else {
