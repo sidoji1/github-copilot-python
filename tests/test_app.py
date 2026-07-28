@@ -1,4 +1,5 @@
 import importlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -101,7 +102,13 @@ def test_check_endpoint_records_completion_time_and_persists(monkeypatch, tmp_pa
 
     client = app_module.app.test_client()
     solved_board = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
-    response = client.post('/check', json={'board': solved_board, 'elapsed_time_seconds': 45})
+    response = client.post('/check', json={
+        'board': solved_board,
+        'elapsed_time_seconds': 45,
+        'name': 'Ada',
+        'difficulty': 'hard',
+        'hints_used': 2,
+    })
 
     assert response.status_code == 200
     assert response.get_json()['completed'] is True
@@ -112,7 +119,13 @@ def test_check_endpoint_records_completion_time_and_persists(monkeypatch, tmp_pa
     leaderboard_response = reloaded_module.app.test_client().get('/leaderboard')
 
     assert leaderboard_response.status_code == 200
-    assert leaderboard_response.get_json() == [{'elapsed_seconds': 45, 'completed_at': response.get_json()['completed_at']}]
+    leaderboard = leaderboard_response.get_json()
+    assert len(leaderboard) == 1
+    assert leaderboard[0]['name'] == 'Ada'
+    assert leaderboard[0]['time'] == 45
+    assert leaderboard[0]['difficulty'] == 'hard'
+    assert leaderboard[0]['hints_used'] == 2
+    assert leaderboard[0]['completed_at'] == response.get_json()['completed_at']
 
 
 def test_check_endpoint_keeps_only_the_top_ten_fastest_times(monkeypatch, tmp_path):
@@ -127,14 +140,38 @@ def test_check_endpoint_keeps_only_the_top_ten_fastest_times(monkeypatch, tmp_pa
     solved_board = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
     for elapsed_seconds in range(100, 111):
         app_module.CURRENT['solved'] = False
-        client.post('/check', json={'board': solved_board, 'elapsed_time_seconds': elapsed_seconds})
+        client.post('/check', json={
+            'board': solved_board,
+            'elapsed_time_seconds': elapsed_seconds,
+            'name': f'Player {elapsed_seconds}',
+            'difficulty': 'medium',
+            'hints_used': 0,
+        })
 
     leaderboard_response = client.get('/leaderboard')
     leaderboard = leaderboard_response.get_json()
 
     assert leaderboard_response.status_code == 200
     assert len(leaderboard) == 10
-    assert [entry['elapsed_seconds'] for entry in leaderboard] == list(range(100, 110))
+    assert [entry['time'] for entry in leaderboard] == list(range(100, 110))
+
+
+def test_leaderboard_loads_legacy_entries_without_new_fields(tmp_path):
+    """Verify older leaderboard entries are normalized without causing errors."""
+    app_module = importlib.import_module("app")
+    leaderboard_path = tmp_path / "leaderboard.json"
+    leaderboard_path.write_text(json.dumps([{'elapsed_seconds': 25, 'completed_at': 'legacy'}]), encoding='utf-8')
+    app_module.LEADERBOARD_FILE = leaderboard_path
+
+    reloaded_module = importlib.reload(app_module)
+    reloaded_module.LEADERBOARD_FILE = leaderboard_path
+    response = reloaded_module.app.test_client().get('/leaderboard')
+
+    assert response.status_code == 200
+    assert response.get_json()[0]['name'] == 'Anonymous'
+    assert response.get_json()[0]['time'] == 25
+    assert response.get_json()[0]['difficulty'] == 'Unknown'
+    assert response.get_json()[0]['hints_used'] == 0
 
 
 def test_check_endpoint_preserves_existing_incorrect_cell_reporting():

@@ -181,18 +181,33 @@ h1 {
 
 #leaderboard-list {
     margin: 0;
-    padding-left: 20px;
     text-align: left;
 }
 
-.leaderboard-item {
-    margin-bottom: 6px;
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
     color: var(--leaderboard-text);
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--leaderboard-border);
+    text-align: left;
+}
+
+.leaderboard-table th {
+    color: var(--leaderboard-heading);
+    font-size: 14px;
+}
+
+.leaderboard-row:nth-child(even) {
+    background: rgba(0, 0, 0, 0.03);
 }
 
 .leaderboard-empty {
     color: var(--leaderboard-empty);
-    list-style: none;
     padding-left: 0;
 }
 

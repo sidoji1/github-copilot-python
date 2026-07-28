@@ -60,6 +60,42 @@ def normalize_elapsed_seconds(value: Any) -> int:
     return 0
 
 
+def normalize_string(value: Any, default: str) -> str:
+    """Return a non-empty string or fall back to the provided default."""
+    if isinstance(value, str):
+        stripped_value = value.strip()
+        if stripped_value:
+            return stripped_value
+    return default
+
+
+def normalize_leaderboard_entry(entry: Any) -> Optional[Dict[str, Any]]:
+    """Normalize a leaderboard entry into the current schema."""
+    if not isinstance(entry, dict):
+        return None
+
+    time_value = normalize_elapsed_seconds(entry.get('time', entry.get('elapsed_seconds')))
+    completed_at = entry.get('completed_at')
+    if not isinstance(completed_at, str):
+        completed_at = ''
+
+    hints_used_value = entry.get('hints_used')
+    if isinstance(hints_used_value, bool):
+        hints_used_value = 0
+    if isinstance(hints_used_value, (int, float)):
+        hints_used = int(hints_used_value)
+    else:
+        hints_used = 0
+
+    return {
+        'name': normalize_string(entry.get('name'), 'Anonymous'),
+        'time': time_value,
+        'difficulty': normalize_string(entry.get('difficulty'), 'Unknown'),
+        'hints_used': hints_used,
+        'completed_at': completed_at,
+    }
+
+
 def load_leaderboard() -> List[Dict[str, Any]]:
     """Load leaderboard entries from the local JSON file if it exists."""
     if not LEADERBOARD_FILE.exists():
@@ -75,15 +111,9 @@ def load_leaderboard() -> List[Dict[str, Any]]:
 
     valid_entries: List[Dict[str, Any]] = []
     for entry in data:
-        if not isinstance(entry, dict):
-            continue
-        elapsed_seconds = entry.get('elapsed_seconds')
-        completed_at = entry.get('completed_at')
-        if isinstance(elapsed_seconds, (int, float)) and not isinstance(elapsed_seconds, bool):
-            valid_entries.append({
-                'elapsed_seconds': int(elapsed_seconds),
-                'completed_at': completed_at if isinstance(completed_at, str) else '',
-            })
+        normalized_entry = normalize_leaderboard_entry(entry)
+        if normalized_entry is not None:
+            valid_entries.append(normalized_entry)
     return valid_entries
 
 
@@ -94,14 +124,17 @@ def save_leaderboard(entries: List[Dict[str, Any]]) -> None:
         json.dump(entries, handle, indent=2)
 
 
-def record_leaderboard_entry(elapsed_seconds: int) -> List[Dict[str, Any]]:
+def record_leaderboard_entry(elapsed_seconds: int, name: str, difficulty: str, hints_used: int) -> List[Dict[str, Any]]:
     """Append a new completion entry and keep only the fastest ten results."""
     entries = load_leaderboard()
     entries.append({
-        'elapsed_seconds': elapsed_seconds,
+        'name': name,
+        'time': elapsed_seconds,
+        'difficulty': difficulty,
+        'hints_used': hints_used,
         'completed_at': datetime.now(timezone.utc).isoformat(),
     })
-    sorted_entries = sorted(entries, key=lambda item: (item['elapsed_seconds'], item['completed_at']))
+    sorted_entries = sorted(entries, key=lambda item: (item['time'], item['completed_at'], item['name']))
     trimmed_entries = sorted_entries[:LEADERBOARD_LIMIT]
     save_leaderboard(trimmed_entries)
     return trimmed_entries
@@ -136,12 +169,38 @@ def check_solution() -> 'flask.wrappers.Response':
     incorrect = find_incorrect_cells(board, solution)
     if not incorrect:
         elapsed_seconds = normalize_elapsed_seconds(data.get('elapsed_time_seconds'))
-        if not CURRENT.get('solved', False):
-            CURRENT['solved'] = True
-            leaderboard = record_leaderboard_entry(elapsed_seconds)
-            completed_at = leaderboard[-1]['completed_at'] if leaderboard else ''
-            return jsonify({'incorrect': incorrect, 'completed': True, 'completed_at': completed_at, 'elapsed_seconds': elapsed_seconds})
-        return jsonify({'incorrect': incorrect, 'completed': True})
+        if CURRENT.get('solved', False):
+            return jsonify({'incorrect': incorrect, 'completed': True})
+
+        name = data.get('name')
+        if not isinstance(name, str) or not name.strip():
+            return jsonify({'incorrect': incorrect, 'completed': True, 'requires_name': True, 'elapsed_seconds': elapsed_seconds})
+
+        difficulty = data.get('difficulty')
+        if not isinstance(difficulty, str) or not difficulty.strip():
+            difficulty = 'Unknown'
+
+        hints_used_value = data.get('hints_used')
+        if isinstance(hints_used_value, bool):
+            hints_used_value = 0
+        if isinstance(hints_used_value, (int, float)):
+            hints_used = int(hints_used_value)
+        else:
+            hints_used = 0
+
+        leaderboard = record_leaderboard_entry(elapsed_seconds, name.strip(), difficulty.strip(), hints_used)
+        CURRENT['solved'] = True
+        completed_at = leaderboard[-1]['completed_at'] if leaderboard else ''
+        return jsonify({
+            'incorrect': incorrect,
+            'completed': True,
+            'completed_at': completed_at,
+            'elapsed_seconds': elapsed_seconds,
+            'time': elapsed_seconds,
+            'name': name.strip(),
+            'difficulty': difficulty.strip(),
+            'hints_used': hints_used,
+        })
 
     return jsonify({'incorrect': incorrect})
 

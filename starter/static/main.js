@@ -4,6 +4,7 @@ const THEME_STORAGE_KEY = 'sudoku-theme';
 let puzzle = [];
 let elapsedSeconds = 0;
 let timerInterval = null;
+let hintCount = 0;
 
 function formatTime(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
@@ -216,12 +217,45 @@ function renderLeaderboard(entries) {
     return;
   }
 
-  entries.forEach((entry, index) => {
-    const item = document.createElement('li');
-    item.className = 'leaderboard-item';
-    item.textContent = `#${index + 1} ${entry.elapsed_seconds}s — ${entry.completed_at}`;
-    leaderboardList.appendChild(item);
+  const table = document.createElement('table');
+  table.className = 'leaderboard-table';
+
+  const headerRow = document.createElement('tr');
+  ['Rank', 'Name', 'Time', 'Difficulty', 'Hints'].forEach((headerText) => {
+    const headerCell = document.createElement('th');
+    headerCell.textContent = headerText;
+    headerRow.appendChild(headerCell);
   });
+  table.appendChild(headerRow);
+
+  entries.forEach((entry, index) => {
+    const row = document.createElement('tr');
+    row.className = 'leaderboard-row';
+
+    const rankCell = document.createElement('td');
+    rankCell.textContent = `#${index + 1}`;
+    row.appendChild(rankCell);
+
+    const nameCell = document.createElement('td');
+    nameCell.textContent = entry.name || 'Anonymous';
+    row.appendChild(nameCell);
+
+    const timeCell = document.createElement('td');
+    timeCell.textContent = `${entry.time ?? entry.elapsed_seconds ?? 0}s`;
+    row.appendChild(timeCell);
+
+    const difficultyCell = document.createElement('td');
+    difficultyCell.textContent = entry.difficulty || 'Unknown';
+    row.appendChild(difficultyCell);
+
+    const hintsCell = document.createElement('td');
+    hintsCell.textContent = entry.hints_used ?? 0;
+    row.appendChild(hintsCell);
+
+    table.appendChild(row);
+  });
+
+  leaderboardList.appendChild(table);
 }
 
 async function loadLeaderboard() {
@@ -234,6 +268,7 @@ async function newGame() {
   const difficultySelect = document.getElementById('difficulty-select');
   const difficulty = difficultySelect ? difficultySelect.value : 'medium';
   startTimer();
+  hintCount = 0;
   const res = await fetch(`/new?difficulty=${encodeURIComponent(difficulty)}`);
   const data = await res.json();
   renderPuzzle(data.puzzle);
@@ -276,6 +311,29 @@ async function checkSolution() {
   }
   if (data.completed) {
     stopTimer();
+    if (data.requires_name) {
+      const playerName = window.prompt('Enter your name for the leaderboard:');
+      if (playerName && playerName.trim()) {
+        const resWithName = await fetch('/check', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            board,
+            elapsed_time_seconds: elapsedSeconds,
+            name: playerName.trim(),
+            difficulty: document.getElementById('difficulty-select')?.value || 'medium',
+            hints_used: hintCount,
+          })
+        });
+        const completionData = await resWithName.json();
+        if (completionData.completed) {
+          await loadLeaderboard();
+          msg.style.color = '#388e3c';
+          msg.innerText = `Congratulations! ${completionData.name} is on the leaderboard.`;
+          return;
+        }
+      }
+    }
     await loadLeaderboard();
     msg.style.color = '#388e3c';
     msg.innerText = 'Congratulations! You solved it!';
@@ -325,6 +383,7 @@ async function getHint() {
     inp.classList.add('prefilled');
     inp.classList.remove('invalid', 'incorrect');
     clearBoardHighlights();
+    hintCount += 1;
     msg.style.color = '#388e3c';
     msg.innerText = 'Hint applied.';
   } else {
