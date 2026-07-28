@@ -24,6 +24,8 @@
     --message-color: #d32f2f;
     --shadow-color: rgba(0, 0, 0, 0.1);
     --panel-shadow: rgba(0, 0, 0, 0.08);
+    --box-light: #ffffff;
+    --box-dark: #dfe8f5;
 }
 
 html[data-theme="dark"] {
@@ -52,6 +54,8 @@ html[data-theme="dark"] {
     --message-color: #ff8a80;
     --shadow-color: rgba(0, 0, 0, 0.35);
     --panel-shadow: rgba(0, 0, 0, 0.3);
+    --box-light: #2a2a2a;
+    --box-dark: #454545;
 }
 
 body {
@@ -130,6 +134,13 @@ h1 {
     background: var(--cell-bg);
     color: var(--text-color);
     transition: background 0.2s ease;
+}
+.box-light {
+    background: var(--box-light);
+}
+
+.box-dark {
+    background: var(--box-dark);
 }
 
 .sudoku-cell:focus {

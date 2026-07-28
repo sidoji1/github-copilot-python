@@ -158,7 +158,11 @@ function createBoardElement() {
       const input = document.createElement('input');
       input.type = 'text';
       input.maxLength = 1;
-      input.className = 'sudoku-cell';
+      const boxClass =
+        ((Math.floor(i / 3) + Math.floor(j / 3)) % 2 === 0)
+          ? 'box-light'
+          : 'box-dark';
+      input.className = `sudoku-cell ${boxClass}`;
       input.dataset.row = i;
       input.dataset.col = j;
       input.addEventListener('input', (e) => {
@@ -290,8 +294,8 @@ async function checkSolution() {
   }
   const res = await fetch('/check', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({board, elapsed_time_seconds: elapsedSeconds})
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ board, elapsed_time_seconds: elapsedSeconds })
   });
   const data = await res.json();
   const msg = document.getElementById('message');
@@ -300,7 +304,7 @@ async function checkSolution() {
     msg.innerText = data.error;
     return;
   }
-  const incorrect = new Set(data.incorrect.map(x => x[0]*SIZE + x[1]));
+  const incorrect = new Set(data.incorrect.map(x => x[0] * SIZE + x[1]));
   for (let idx = 0; idx < inputs.length; idx++) {
     const inp = inputs[idx];
     if (inp.disabled) continue;
@@ -316,7 +320,7 @@ async function checkSolution() {
       if (playerName && playerName.trim()) {
         const resWithName = await fetch('/check', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             board,
             elapsed_time_seconds: elapsedSeconds,
@@ -358,8 +362,8 @@ async function getHint() {
 
   const res = await fetch('/hint', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({board})
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ board })
   });
   const data = await res.json();
   const msg = document.getElementById('message');
