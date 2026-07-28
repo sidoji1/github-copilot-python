@@ -29,6 +29,15 @@ def find_incorrect_cells(board: Board, solution: Board) -> List[List[int]]:
     ]
 
 
+def find_hint(board: Board, solution: Board) -> Optional[dict[str, int]]:
+    """Return one hint for the first empty cell using the stored solution."""
+    for row in range(sudoku_logic.SIZE):
+        for col in range(sudoku_logic.SIZE):
+            if board[row][col] == sudoku_logic.EMPTY:
+                return {'row': row, 'col': col, 'value': solution[row][col]}
+    return None
+
+
 @app.route('/')
 def index() -> str:
     """Render the main Sudoku game page."""
@@ -55,6 +64,24 @@ def check_solution() -> 'flask.wrappers.Response':
         return jsonify({'error': 'No game in progress'}), 400
     incorrect = find_incorrect_cells(board, solution)
     return jsonify({'incorrect': incorrect})
+
+
+@app.route('/hint', methods=['POST'])
+def get_hint() -> 'flask.wrappers.Response':
+    """Return one solution value for a currently empty cell."""
+    data = request.json or {}
+    board = data.get('board')
+    solution = CURRENT.get('solution')
+    if solution is None:
+        return jsonify({'error': 'No game in progress'}), 400
+    if not isinstance(board, list):
+        return jsonify({'error': 'Board data is required'}), 400
+
+    hint = find_hint(board, solution)
+    if hint is None:
+        return jsonify({'error': 'No empty cells remaining'}), 400
+    return jsonify(hint)
+
 
 if __name__ == '__main__':
     app.run(debug=True)

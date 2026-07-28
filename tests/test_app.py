@@ -60,3 +60,31 @@ def test_generated_puzzles_have_unique_solution():
     solution_count = sudoku_logic.count_solutions(puzzle)
 
     assert solution_count == 1
+
+
+def test_hint_endpoint_returns_one_value_from_the_stored_solution():
+    """Verify the hint endpoint reveals one value from the stored solution."""
+    app_module = importlib.import_module("app")
+    app_module.CURRENT['solution'] = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
+    app_module.CURRENT['puzzle'] = [[0] * 9 for _ in range(9)]
+
+    client = app_module.app.test_client()
+    response = client.post('/hint', json={'board': [[0] * 9 for _ in range(9)]})
+
+    assert response.status_code == 200
+    assert response.get_json() == {'row': 0, 'col': 0, 'value': 1}
+
+
+def test_hint_endpoint_skips_player_filled_cells():
+    """Verify the hint endpoint chooses an empty cell instead of a player-filled one."""
+    app_module = importlib.import_module("app")
+    app_module.CURRENT['solution'] = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
+    app_module.CURRENT['puzzle'] = [[0] * 9 for _ in range(9)]
+
+    client = app_module.app.test_client()
+    board = [[0] * 9 for _ in range(9)]
+    board[0][0] = 5
+    response = client.post('/hint', json={'board': board})
+
+    assert response.status_code == 200
+    assert response.get_json() == {'row': 0, 'col': 1, 'value': 2}
