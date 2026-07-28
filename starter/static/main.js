@@ -1,5 +1,6 @@
 // Client-side rendering and interaction for the Flask-backed Sudoku
 const SIZE = 9;
+const THEME_STORAGE_KEY = 'sudoku-theme';
 let puzzle = [];
 let elapsedSeconds = 0;
 let timerInterval = null;
@@ -31,6 +32,25 @@ function startTimer() {
 function stopTimer() {
   clearInterval(timerInterval);
   timerInterval = null;
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const toggleButton = document.getElementById('theme-toggle');
+  if (toggleButton) {
+    toggleButton.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+    toggleButton.setAttribute('aria-pressed', String(theme === 'dark'));
+  }
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
+
+function initializeTheme() {
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = savedTheme === 'dark' || savedTheme === 'light'
+    ? savedTheme
+    : (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
 }
 
 function createBoardElement() {
@@ -208,6 +228,16 @@ async function getHint() {
 
 // Wire buttons
 window.addEventListener('load', () => {
+  initializeTheme();
+
+  const themeToggle = document.getElementById('theme-toggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      applyTheme(currentTheme);
+    });
+  }
+
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('hint').addEventListener('click', getHint);
   document.getElementById('check-solution').addEventListener('click', checkSolution);

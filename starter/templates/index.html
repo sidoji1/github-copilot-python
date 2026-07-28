@@ -3,27 +3,43 @@
 <head>
   <meta charset="utf-8">
   <title>Sudoku Game</title>
+  <script>
+    (function () {
+      const storageKey = 'sudoku-theme';
+      const savedTheme = localStorage.getItem(storageKey);
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = savedTheme === 'dark' || savedTheme === 'light'
+        ? savedTheme
+        : (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <h1>Sudoku Game</h1>
-  <div id="game-timer" aria-live="polite">00:00</div>
-  <div id="sudoku-board"></div>
-  <section class="leaderboard" aria-labelledby="leaderboard-heading">
-    <h2 id="leaderboard-heading">Top 10 Leaderboard</h2>
-    <ol id="leaderboard-list"></ol>
-  </section>
-  <div class="controls">
-    <label for="difficulty-select">Difficulty:</label>
-    <select id="difficulty-select">
-      <option value="easy">Easy</option>
-      <option value="medium" selected>Medium</option>
-      <option value="hard">Hard</option>
-    </select>
-    <button id="new-game">New Game</button>
-    <button id="hint">Hint</button>
-    <button id="check-solution">Check Solution</button>
-    <span id="message"></span>
+  <div class="app-shell">
+    <div class="page-header">
+      <h1>Sudoku Game</h1>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">Dark Mode</button>
+    </div>
+    <div id="game-timer" aria-live="polite">00:00</div>
+    <div id="sudoku-board"></div>
+    <section class="leaderboard" aria-labelledby="leaderboard-heading">
+      <h2 id="leaderboard-heading">Top 10 Leaderboard</h2>
+      <ol id="leaderboard-list"></ol>
+    </section>
+    <div class="controls">
+      <label for="difficulty-select">Difficulty:</label>
+      <select id="difficulty-select">
+        <option value="easy">Easy</option>
+        <option value="medium" selected>Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+      <button id="new-game">New Game</button>
+      <button id="hint">Hint</button>
+      <button id="check-solution">Check Solution</button>
+      <span id="message"></span>
+    </div>
   </div>
   <script src="/static/main.js"></script>
 </body>
