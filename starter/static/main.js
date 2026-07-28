@@ -78,6 +78,35 @@ function renderPuzzle(puz) {
   }
 }
 
+function renderLeaderboard(entries) {
+  const leaderboardList = document.getElementById('leaderboard-list');
+  if (!leaderboardList) {
+    return;
+  }
+
+  leaderboardList.innerHTML = '';
+  if (!entries.length) {
+    const emptyItem = document.createElement('li');
+    emptyItem.className = 'leaderboard-empty';
+    emptyItem.textContent = 'No completed games yet.';
+    leaderboardList.appendChild(emptyItem);
+    return;
+  }
+
+  entries.forEach((entry, index) => {
+    const item = document.createElement('li');
+    item.className = 'leaderboard-item';
+    item.textContent = `#${index + 1} ${entry.elapsed_seconds}s — ${entry.completed_at}`;
+    leaderboardList.appendChild(item);
+  });
+}
+
+async function loadLeaderboard() {
+  const res = await fetch('/leaderboard');
+  const entries = await res.json();
+  renderLeaderboard(entries);
+}
+
 async function newGame() {
   const difficultySelect = document.getElementById('difficulty-select');
   const difficulty = difficultySelect ? difficultySelect.value : 'medium';
@@ -86,6 +115,7 @@ async function newGame() {
   const data = await res.json();
   renderPuzzle(data.puzzle);
   document.getElementById('message').innerText = '';
+  await loadLeaderboard();
 }
 
 async function checkSolution() {
@@ -103,7 +133,7 @@ async function checkSolution() {
   const res = await fetch('/check', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({board})
+    body: JSON.stringify({board, elapsed_time_seconds: elapsedSeconds})
   });
   const data = await res.json();
   const msg = document.getElementById('message');
@@ -121,8 +151,9 @@ async function checkSolution() {
       inp.className = 'sudoku-cell incorrect';
     }
   }
-  if (incorrect.size === 0) {
+  if (data.completed) {
     stopTimer();
+    await loadLeaderboard();
     msg.style.color = '#388e3c';
     msg.innerText = 'Congratulations! You solved it!';
   } else {

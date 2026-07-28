@@ -88,3 +88,65 @@ def test_hint_endpoint_skips_player_filled_cells():
 
     assert response.status_code == 200
     assert response.get_json() == {'row': 0, 'col': 1, 'value': 2}
+
+
+def test_check_endpoint_records_completion_time_and_persists(monkeypatch, tmp_path):
+    """Verify a solved board records a leaderboard entry and persists it."""
+    app_module = importlib.import_module("app")
+    leaderboard_path = tmp_path / "leaderboard.json"
+    app_module.LEADERBOARD_FILE = leaderboard_path
+    app_module.CURRENT['solution'] = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
+    app_module.CURRENT['puzzle'] = [[0] * 9 for _ in range(9)]
+
+    client = app_module.app.test_client()
+    solved_board = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
+    response = client.post('/check', json={'board': solved_board, 'elapsed_time_seconds': 45})
+
+    assert response.status_code == 200
+    assert response.get_json()['completed'] is True
+    assert leaderboard_path.exists()
+
+    reloaded_module = importlib.reload(app_module)
+    reloaded_module.LEADERBOARD_FILE = leaderboard_path
+    leaderboard_response = reloaded_module.app.test_client().get('/leaderboard')
+
+    assert leaderboard_response.status_code == 200
+    assert leaderboard_response.get_json() == [{'elapsed_seconds': 45, 'completed_at': response.get_json()['completed_at']}]
+
+
+def test_check_endpoint_keeps_only_the_top_ten_fastest_times(monkeypatch, tmp_path):
+    """Verify the leaderboard keeps only the fastest ten completion entries."""
+    app_module = importlib.import_module("app")
+    leaderboard_path = tmp_path / "leaderboard.json"
+    app_module.LEADERBOARD_FILE = leaderboard_path
+    app_module.CURRENT['solution'] = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
+    app_module.CURRENT['puzzle'] = [[0] * 9 for _ in range(9)]
+
+    client = app_module.app.test_client()
+    solved_board = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
+    for elapsed_seconds in range(100, 111):
+        app_module.CURRENT['solved'] = False
+        client.post('/check', json={'board': solved_board, 'elapsed_time_seconds': elapsed_seconds})
+
+    leaderboard_response = client.get('/leaderboard')
+    leaderboard = leaderboard_response.get_json()
+
+    assert leaderboard_response.status_code == 200
+    assert len(leaderboard) == 10
+    assert [entry['elapsed_seconds'] for entry in leaderboard] == list(range(100, 110))
+
+
+def test_check_endpoint_preserves_existing_incorrect_cell_reporting():
+    """Verify the existing /check behavior remains intact for incomplete boards."""
+    app_module = importlib.import_module("app")
+    app_module.CURRENT['solution'] = [[1 + (row * 3 + col) % 9 for col in range(9)] for row in range(9)]
+    app_module.CURRENT['puzzle'] = [[0] * 9 for _ in range(9)]
+
+    client = app_module.app.test_client()
+    board = [[0] * 9 for _ in range(9)]
+    board[0][0] = 5
+    response = client.post('/check', json={'board': board, 'elapsed_time_seconds': 30})
+
+    assert response.status_code == 200
+    assert response.get_json()['incorrect']
+    assert 'completed' not in response.get_json()
