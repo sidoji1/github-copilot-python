@@ -161,6 +161,11 @@ function createBoardElement() {
       input.dataset.row = i;
       input.dataset.col = j;
       input.addEventListener('input', (e) => {
+        if (e.target.disabled) {
+          e.target.value = '';
+          return;
+        }
+
         const val = e.target.value.replace(/[^1-9]/g, '');
         e.target.value = val;
         updateInvalidHighlights();
@@ -314,7 +319,10 @@ async function getHint() {
   }
 
   if (inp.value === '') {
+    // Treat hinted cells as permanently locked, matching the existing prefilled-cell behavior.
     inp.value = data.value;
+    inp.disabled = true;
+    inp.classList.add('prefilled');
     inp.classList.remove('invalid', 'incorrect');
     clearBoardHighlights();
     msg.style.color = '#388e3c';

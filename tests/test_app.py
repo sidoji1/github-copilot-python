@@ -1,4 +1,5 @@
 import importlib
+import re
 import sys
 from pathlib import Path
 
@@ -150,3 +151,15 @@ def test_check_endpoint_preserves_existing_incorrect_cell_reporting():
     assert response.status_code == 200
     assert response.get_json()['incorrect']
     assert 'completed' not in response.get_json()
+
+
+def test_hint_handler_marks_filled_cells_as_locked():
+    """Verify the client-side hint flow locks hinted cells using the prefilled style."""
+    main_js_path = REPO_ROOT / "starter" / "static" / "main.js"
+    content = main_js_path.read_text(encoding="utf-8")
+
+    hint_block = re.search(r"async function getHint\(\)[\s\S]*?msg\.innerText = 'Hint applied\.';", content)
+
+    assert hint_block is not None
+    assert "inp.disabled = true;" in hint_block.group(0)
+    assert "inp.classList.add('prefilled');" in hint_block.group(0)
